@@ -1,0 +1,64 @@
+
+Init I2C1 pins as normal GPIO and forcefully pull it high to make the slave recognise the master
+---------------------------------------------------------------------------------------------
+GPIOPinsInit (GPIOB, GPIO_PIN_9, GPIO_MODE_OUTPUT_PP,GPIO_SPEED_FREQ_MEDIUM, GPIO_PULLUP);//I2C 1 SDA for mainboard
+GPIOPinsInit (GPIOB, GPIO_PIN_8, GPIO_MODE_OUTPUT_PP,GPIO_SPEED_FREQ_MEDIUM, GPIO_PULLUP);//I2C 1 SCL for mainboard
+
+HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, 1);
+HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, 1);
+	
+---------------------------------------------------------------------------------
+Declare a new task with high prio as possible to init IWDG feed the dog
+
+add before  init IWDG xCreatedEventGroup=xEventGroupCreate();
+
+void FeedTask(void *argument){
+
+	int timeout=500;
+
+	EventBits_t Event_Bits;
+
+	int	feeding_rate=timeout/2;
+
+	const TickType_t xTicksToWait = feeding_rate / portTICK_PERIOD_MS;
+
+	IWDG_Init(timeout,8);//1s timeout
+	// WWDG_Init(13,20,4);
+
+	HAL_UART_Transmit(&huart2, (uint8_t *)((char *)"Init\n"), 5, 10);
+	while(1){
+
+		Event_Bits=xEventGroupWaitBits(xCreatedEventGroup,TASK_BIT_ALL,pdTRUE,pdTRUE,xTicksToWait);
+
+		if((Event_Bits&TASK_BIT_ALL)==TASK_BIT_ALL)
+			HAL_IWDG_Refresh(&hiwdg);
+
+		
+	}
+}
+--------------------------------------------------------
+in common.h
+#include "FreeRTOS.h"
+#include "task.h"
+#include "event_groups.h"
+
+#define TASK_BIT_1 ( 0x01 << 0 )
+#define TASK_BIT_2 ( 0x01 << 1 )
+#define TASK_BIT_3 ( 0x01 << 2 )
+#define TASK_BIT_4 ( 0x01 << 3 )
+#define TASK_BIT_5 ( 0x01 << 4 )
+#define TASK_BIT_6 ( 0x01 << 5 )
+#define TASK_BIT_7 ( 0x01 << 6 )
+
+#define TASK_BIT_ALL ( TASK_BIT_1 | TASK_BIT_2 )// depending on number of tasks the user wants to check
+
+EventGroupHandle_t xCreatedEventGroup;
+-------------------------------------------------------------------------------
+
+In each task, put,xEventGroupSetBits(xCreatedEventGroup,TASK_BIT_X); it will check whether the task is executed or not
+
+
+
+
+
+
